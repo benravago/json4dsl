@@ -1,0 +1,12 @@
+{
+  object: {
+    number: 3.14159265
+  },
+  #name: path.like {
+  },
+  name: identifier ( arg1: 1, arg2: "2", arg3: null ) {
+    item: x,
+    item: yz,
+    path: a.bc( d:ef ) { g:hi }
+  }
+}

@@ -1,53 +1,17 @@
 {
+  "string": "quoted",
+  "number": 0, 
+  "array": [ "0", 1, 23.456, 789.0e+2, -1.23e-4 ],
+  "yes": true,
+  "no": false,
   "object": {
-    "number": 3.14159265,
-    "string": "Multi-\nline\nstring",
-    "boolean": true
-  },
-  "arrayOfObjects": [
-    {
-      "item": 1
+    "inner": { 
+      "property": "value"
     },
-    {
-      "item": 2
-    },
-    {
-      "item": 3
-    }
-  ],
-  "arrayOfNumbers": [
-    1,
-    2,
-    3,
-    4,
-    5
-  ],
-  "mixedArray": [
-    -1,
-    "foo",
-    true,
-    false,
-    null,
-    {
-      "end": true
-    }
-  ],
-  "more": {
-    "float": -123E+45,
-    "bool": false,
+    "multi": [
+      { "item": {} }
+    ],
+    "empty": [],
     "nil": null
-  },
-  "emptyObject": {
-    "object": {
-    },
-    "array": [
-    ]
-  },
-  "emptyArray": [
-    {
-    },
-    [
-    ]
-  ]
+  }    
 }
-

@@ -1,108 +1,146 @@
-package lib.json;
+package lib.json.tool;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
-public class JsonPrinter implements ContentHandler {
+import lib.json.JsonListener;
+import lib.json.JsonParser;
+import lib.json.ParseInput;
 
-    int indent;
-    StringBuilder lead = new StringBuilder("\n");
-    StringBuilder buf = new StringBuilder();
+public class Json implements JsonListener {
 
-    public JsonPrinter() {
-        this(0);
-    }
+  int indent;
+  StringBuilder lead = new StringBuilder("\n");
+  StringBuilder buf = new StringBuilder();
 
-    public JsonPrinter(int indent) {
-        this.indent = indent;
-    }
+  public Json() {
+    this(0);
+  }
 
-    void push() {
-        if (indent > 0) {
-            var i = indent; while (i-- > 0) lead.append(' ');
-        }
-    }
+  public Json(int indent) {
+    this.indent = indent;
+  }
 
-    void pop() {
-        if (indent > 0) {
-            lead.setLength(lead.length() - indent);
-        }
+  void push() {
+    if (indent > 0) {
+      var i = indent;
+      while (i-- > 0) lead.append(' ');
     }
+  }
 
-    void clip() {
-        var n = buf.length();
-        if (n > 0 && buf.charAt(--n) == ',') {
-            buf.setLength(n);
-        }
+  void pop() {
+    if (indent > 0) {
+      lead.setLength(lead.length() - indent);
     }
+  }
 
-    void tag(String name) {
-        if (indent > 0) buf.append(lead);
-        if (name != null) {
-            quote(name); buf.append(':'); gap();
-        }
+  void clip() {
+    var n = buf.length();
+    if (n > 0 && buf.charAt(--n) == ',') {
+      buf.setLength(n);
     }
-    
-    void gap() {
-        if (indent > 0) buf.append(' ');
-    }
+  }
 
-    void quote(String name) {
-        buf.append('"').append(name).append('"');
+  void tag(String name) {
+    if (indent > 0) buf.append(lead);
+    if (name != null) {
+      quote(name);
+      buf.append(':');
+      gap();
     }
+  }
 
-    public void reset() {
-        buf.setLength(0);
-    }
+  void gap() {
+    if (indent > 0) buf.append(' ');
+  }
 
-    @Override
-    public String toString() {
-        var start = 0;
-        var end = buf.length();
-        if (end > 0) {
-            if (buf.charAt(end-1) == ',') end--;
-            if (buf.charAt(start) == '\n') start++;
-        }
-        return buf.substring(start,end);
-    }
+  void quote(String name) {
+    buf.append('"').append(name).append('"');
+  }
 
-    @Override
-    public void objectStart(String name) {
-        tag(name); buf.append('{'); push();
-    }
-    @Override
-    public void objectEnd() {
-        clip(); pop(); tag(null); buf.append("},");
-    }
-    @Override
-    public void arrayStart(String name) {
-        tag(name); buf.append('['); push();
-    }
-    @Override
-    public void arrayEnd() {
-        clip(); pop(); tag(null); buf.append("],");
-    }
-    @Override
-    public void booleanValue(String name, Boolean value) {
-        tag(name); buf.append(value).append(',');
-    }
-    @Override
-    public void nullValue(String name) {
-        tag(name); buf.append("null,");
-    }
-    @Override
-    public void stringValue(String name, String value) {
-        tag(name); buf.append('"').append(value).append("\",");
-    }
+  public void reset() {
+    buf.setLength(0);
+  }
 
-    @Override
-    public void numberValue(String name, Number value) {
-        tag(name);
-        if (value instanceof BigDecimal) {
-            buf.append(((BigDecimal)value).toEngineeringString());
-        } else {
-            buf.append(value);
-        }
-        buf.append(',');
+  @Override
+  public String toString() {
+    var start = 0;
+    var end = buf.length();
+    if (end > 0) {
+      if (buf.charAt(end - 1) == ',') end--;
+      if (buf.charAt(start) == '\n') start++;
     }
+    return buf.substring(start, end);
+  }
 
+  @Override
+  public void objectStart(String name) {
+    tag(name);
+    buf.append('{');
+    push();
+  }
+
+  @Override
+  public void objectEnd() {
+    clip();
+    pop();
+    tag(null);
+    buf.append("},");
+  }
+
+  @Override
+  public void arrayStart(String name) {
+    tag(name);
+    buf.append('[');
+    push();
+  }
+
+  @Override
+  public void arrayEnd() {
+    clip();
+    pop();
+    tag(null);
+    buf.append("],");
+  }
+
+  @Override
+  public void booleanValue(String name, Boolean value) {
+    tag(name);
+    buf.append(value).append(',');
+  }
+
+  @Override
+  public void nullValue(String name) {
+    tag(name);
+    buf.append("null,");
+  }
+
+  @Override
+  public void stringValue(String name, String value) {
+    tag(name);
+    buf.append('"').append(value).append("\",");
+  }
+
+  @Override
+  public void numberValue(String name, Number value) {
+    tag(name);
+    if (value instanceof BigDecimal decimal) {
+      buf.append(decimal.toEngineeringString());
+    } else {
+      buf.append(value);
+    }
+    buf.append(',');
+  }
+
+
+  public static void main(String...args) throws Exception {
+    if (args.length != 1) return;
+    var handler = new Json(2);
+    new JsonParser<Json>()
+      .handler(handler)
+      .reset(new ParseInput(Files.readString(Paths.get(args[0])).toCharArray()))
+      .parse();
+    System.out.println("json: "+handler);
+  }
 }

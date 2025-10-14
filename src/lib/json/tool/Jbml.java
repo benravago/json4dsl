@@ -1,11 +1,7 @@
 package lib.json.tool;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
-
 import lib.json.JbmlListener;
 import lib.json.JbmlParser;
-import lib.json.ParseInput;
 
 public class Jbml extends Jsl implements JbmlListener {
 
@@ -22,13 +18,12 @@ public class Jbml extends Jsl implements JbmlListener {
     buf.append("\n! ").append(name).append(' ').append(target);
   }
 
-
   public static void main(String...args) throws Exception {
     if (args.length != 1) return;
     var handler = new Jbml(2);
     new JbmlParser()
       .handler(handler)
-      .reset(new ParseInput(Files.readString(Paths.get(args[0])).toCharArray()))
+      .reset(chars(args[0]))
       .parse();
     System.out.println("jbml: "+handler);
   }

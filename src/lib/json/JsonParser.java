@@ -6,7 +6,7 @@ public class JsonParser<CH extends JsonListener> {
 
   CH handler;
 
-  char[] buf;
+  String buf;
   int position, limit;
   int offset, length;
   int lines, mark;
@@ -19,9 +19,9 @@ public class JsonParser<CH extends JsonListener> {
     return this;
   }
 
-  public JsonParser<CH> reset(ParseInput in) {
-    buf = in.getChars();
-    limit = buf.length;
+  public JsonParser<CH> reset(String input) {
+    buf = input;
+    limit = buf.length();
     position = 0;
     lines = mark = 0;
     name = null;
@@ -32,16 +32,10 @@ public class JsonParser<CH extends JsonListener> {
     try {
       prologue();
       var c = nonWhitespace();
-      if (c == '{') {
-        object();
-      } else {
-        if (c == '[') {
-          array();
-        } else {
-          if (c != EOF) {
-            throw new ParseException(invalid());
-          }
-        }
+      switch (c) {
+        case '{' -> object();
+        case '[' -> array();
+        default -> { if (c != EOF) throw new ParseException(invalid()); }
       }
     }
     catch (IndexOutOfBoundsException e) {
@@ -53,7 +47,7 @@ public class JsonParser<CH extends JsonListener> {
   }
 
   String invalid() {
-    return "invalid character '" + buf[position - 1] + "'" + location();
+    return "invalid character <" + buf.codePointAt(position - 1) + ">" + location();
   }
 
   String location() {
@@ -62,7 +56,7 @@ public class JsonParser<CH extends JsonListener> {
 
   int nonWhitespace() {
     while (position < limit) {
-      var c = buf[position++];
+      var c = buf.codePointAt(position++);
       if (c == ' ' || c == '\r' || c == '\t') continue;
       if (c == '\n') {
         lines += 1;
@@ -78,7 +72,7 @@ public class JsonParser<CH extends JsonListener> {
     handler.objectStart(name);
     if (!empty('}')) {
       for (;;) {
-        name();
+        key();
         value();
         var c = nonWhitespace();
         if (c == ',') continue;
@@ -105,52 +99,37 @@ public class JsonParser<CH extends JsonListener> {
     handler.arrayEnd();
   }
 
-  void name() {
+  void key() {
     name = null;
     var c = nonWhitespace();
     if (c == '"') {
       string();
       if (nonWhitespace() == ':') {
-        name = new String(buf, offset, length);
+        name = buf.substring(offset, offset+length);
       }
-    } else if (!specialName(c)) {
+    } else if (!specialKey(c)) {
       throw new ParseException("missing name" + location());
     }
   }
 
   void value() {
     var c = nonWhitespace();
-    if (c == '"') {
-      string();
-      handler.stringValue(name, new String(buf, offset, length));
-    } else {
-      if (numeric(c)) {
-        number();
-        handler.numberValue(name, new BigDecimal(buf, offset, (position - offset)));
-      } else {
-        if (c == '{') {
-          object();
-        } else {
-          if (c == '[') {
-            array();
-          } else {
-            if (token("true")) {
-              handler.booleanValue(name, Boolean.TRUE);
-            } else {
-              if (token("false")) {
-                handler.booleanValue(name, Boolean.FALSE);
-              } else {
-                if (token("null")) {
-                  handler.nullValue(name);
-                } else {
-                  if (!specialValue(c)) {
-                    throw new ParseException(invalid());
-                  }
-                }
-              }
-            }
-          }
-        }
+    switch (c) {
+      case '{' -> object();
+      case '[' -> array();
+      case '"' -> {
+        string();
+        handler.stringValue(name, buf.substring(offset, offset+length));
+      }
+      default -> {
+        if (numeric(c)) {
+          number();
+          handler.numberValue(name, new BigDecimal(buf.substring(offset,position).toCharArray()));
+        } else
+        if (token("true")) handler.booleanValue(name, Boolean.TRUE); else
+        if (token("false")) handler.booleanValue(name, Boolean.FALSE); else
+        if (token("null")) handler.nullValue(name); else
+        if (!specialValue(c)) throw new ParseException(invalid());
       }
     }
   }
@@ -159,7 +138,7 @@ public class JsonParser<CH extends JsonListener> {
     var mark = position;
     var n = s.length();
     for (var i = 1; i < n; i++) {
-      if (s.charAt(i) != buf[position++]) {
+      if (s.charAt(i) != buf.codePointAt(position++)) {
         position = mark;
         return false;
       }
@@ -169,17 +148,29 @@ public class JsonParser<CH extends JsonListener> {
 
   void string() {
     offset = position;
-    for (;;) {
-      var c = buf[position++];
-      if (c == '"') {
-        length = (position - 1) - offset;
-        return;
-      }
-      if (c == '\b' || c == '\f' || c == '\n' || c == '\r' || c == '\t') break;
-      if (c == '\\') {
-        c = buf[position++];
-        if (c == '"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || (c == 'u' && utf16())) continue;
-        break;
+    loop: for (;;) {
+      var c = buf.codePointAt(position++);
+      switch (c) {
+        case '"' -> {
+          length = (position - 1) - offset;
+          return;
+        }
+        case '\b', '\f', '\n', '\r', '\t' -> {
+          break loop;
+        }
+        case '\\' -> {
+          c = buf.codePointAt(position++);
+          switch (c) {
+            case '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> {
+              continue loop;
+            }
+            default -> {
+              if (c == 'u' && utf16()) {
+                continue loop;
+              } else break loop;
+            }
+          }
+        }
       }
     }
     throw new ParseException("invalid character" + location());
@@ -187,8 +178,8 @@ public class JsonParser<CH extends JsonListener> {
 
   boolean utf16() {
     for (var i = 0; i < 4; i++) {
-      var c = buf[position++];
-      if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) continue;
+      var c = buf.codePointAt(position++);
+      if ((c >= '0' && '9' >= c) || (c >= 'A' && 'F' >= c) || (c >= 'a' && 'f' >= c)) continue;
       return false;
     }
     return true;
@@ -199,7 +190,7 @@ public class JsonParser<CH extends JsonListener> {
       offset = position - 1;
       return true;
     }
-    if ('0' <= c && c <= '9') {
+    if (c >= '0' && '9' >= c) {
       offset = --position;
       return true;
     }
@@ -210,16 +201,16 @@ public class JsonParser<CH extends JsonListener> {
     if (!digits()) {
       throw new ParseException(invalid());
     }
-    var c = buf[position];
+    var c = buf.codePointAt(position);
     if (c == '.') {
       position++;
       if (!digits()) {
         throw new ParseException(invalid());
       }
-      c = buf[position];
+      c = buf.codePointAt(position);
     }
     if (c == 'e' || c == 'E') {
-      c = buf[++position];
+      c = buf.codePointAt(++position);
       if (c == '+' || c == '-') {
         position++;
       }
@@ -232,7 +223,7 @@ public class JsonParser<CH extends JsonListener> {
   boolean digits() {
     var p = position;
     for (;;) {
-      var c = buf[position];
+      var c = buf.codePointAt(position);
       if (c < '0' || '9' < c) break;
       position++;
     }
@@ -252,7 +243,7 @@ public class JsonParser<CH extends JsonListener> {
     // any initial processing
   }
 
-  boolean specialName(int c) {
+  boolean specialKey(int c) {
     return false;
   }
 

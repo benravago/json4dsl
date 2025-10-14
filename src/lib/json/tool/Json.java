@@ -1,17 +1,18 @@
 package lib.json.tool;
 
 import java.math.BigDecimal;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import lib.json.JsonListener;
 import lib.json.JsonParser;
-import lib.json.ParseInput;
 
 public class Json implements JsonListener {
 
-  int indent;
-  StringBuilder lead = new StringBuilder("\n");
+  int indent = 0, lead = 0;
   StringBuilder buf = new StringBuilder();
 
   public Json() {
@@ -23,16 +24,11 @@ public class Json implements JsonListener {
   }
 
   void push() {
-    if (indent > 0) {
-      var i = indent;
-      while (i-- > 0) lead.append(' ');
-    }
+    if (indent > 0) lead += indent;
   }
 
   void pop() {
-    if (indent > 0) {
-      lead.setLength(lead.length() - indent);
-    }
+    if (indent > 0) lead -= indent;
   }
 
   void clip() {
@@ -43,7 +39,10 @@ public class Json implements JsonListener {
   }
 
   void tag(String name) {
-    if (indent > 0) buf.append(lead);
+    if (indent > 0) {
+      buf.append('\n');
+      for (var i = lead; i > 0; i--) buf.append(' ');
+    }
     if (name != null) {
       quote(name);
       buf.append(':');
@@ -133,14 +132,19 @@ public class Json implements JsonListener {
     buf.append(',');
   }
 
+  static String chars(String path) {
+    try { return Files.readString(Paths.get(path)); }
+    catch (IOException ioe) { throw new UncheckedIOException(ioe); }
+  }
 
   public static void main(String...args) throws Exception {
     if (args.length != 1) return;
     var handler = new Json(2);
     new JsonParser<Json>()
       .handler(handler)
-      .reset(new ParseInput(Files.readString(Paths.get(args[0])).toCharArray()))
+      .reset(chars(args[0]))
       .parse();
     System.out.println("json: "+handler);
   }
+
 }

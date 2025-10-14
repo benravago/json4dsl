@@ -45,7 +45,7 @@ public class JbmlParser extends JslParser<JbmlListener> {
     var c = nonWhitespace();
     if (isJavaIdentifierStart(c) || isIdentifierPart(c)) {
       special();
-      name = new String(buf, offset, (position - offset));
+      name = buf.substring(offset, position);
       return true;
     }
     return false;

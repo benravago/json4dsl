@@ -1,11 +1,7 @@
 package lib.json.tool;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
-
 import lib.json.JslListener;
 import lib.json.JslParser;
-import lib.json.ParseInput;
 
 public class Jsl extends Json implements JslListener {
 
@@ -56,13 +52,12 @@ public class Jsl extends Json implements JslListener {
     super.objectStart(name);
   }
 
-
   public static void main(String...args) throws Exception {
     if (args.length != 1) return;
     var handler = new Jsl(2);
     new JslParser<Jsl>()
       .handler(handler)
-      .reset(new ParseInput(Files.readString(Paths.get(args[0])).toCharArray()))
+      .reset(chars(args[0]))
       .parse();
     System.out.println("jsl: "+handler);
   }

@@ -1,16 +1,14 @@
 package lib.json;
 
-import static java.lang.Character.*;
-
 public class JslParser<T extends JslListener> extends JsonParser<T>{
 
   @Override
-  boolean specialName(int c) {
-    if (isJavaIdentifierStart(c) || isIdentifierPart(c)) {
+  boolean specialKey(int c) {
+    if (isIdentifierStart(c) || isIdentifierSymbol(c)) {
       special();
       length = position - offset;
       if (nonWhitespace() == ':') {
-        name = new String(buf,offset,length);
+        name = buf.substring(offset,offset+length);
         return true;
       }
     }
@@ -23,9 +21,9 @@ public class JslParser<T extends JslListener> extends JsonParser<T>{
   }
 
   boolean identifier(int c) {
-    if (isJavaIdentifierStart(c) || isIdentifierPart(c)) {
+    if (isIdentifierStart(c) || isIdentifierSymbol(c)) {
       special();
-      var ident = new String(buf,offset,(position-offset));
+      var ident = buf.substring(offset,position);
       entity(ident);
       return true;
     }
@@ -69,38 +67,26 @@ public class JslParser<T extends JslListener> extends JsonParser<T>{
     }
   }
 
-  // TODO: accept "-quoted names
-
   void tag() {
     name = null;
     var mark = position;
     var c = nonWhitespace();
-    if (specialName(c)) return;
+    if (specialKey(c)) return;
     position = mark;
   }
 
   void special() {
     int c;
     offset = position - 1;
-    do { c = buf[position++]; }
-    while (isJavaIdentifierPart(c) || isIdentifierPart(c));
+    do { c = buf.codePointAt(position++); }
+    while (isIdentifierPart(c) || isIdentifierSymbol(c));
     position--;
-  }
-
-  boolean isIdentifierPart(int c) {
-    return 0 < c && c < 128 && SYM[c] == 1;
-  }
-
-  final static byte[] SYM = new byte[128];
-  static {  // excludes ' ( ) + , - : ; [ ] ` { }
-    char[] c = {'!','#','$','%','&','*','.','/','<','=','>','?','@','^','_','|','~'};
-    for (var i:c) SYM[i] = 1;
   }
 
   static final int K = '"';
 
   boolean blockquote(int c) {
-    return K == c && position < limit - 2 && K == buf[position+0] && K == buf[position+1];
+    return K == c && position < limit - 2 && K == buf.codePointAt(position+0) && K == buf.codePointAt(position+1);
   }
 
   boolean block(int c) {
@@ -108,10 +94,10 @@ public class JslParser<T extends JslListener> extends JsonParser<T>{
       position += 2;
       offset = position;
       while (c != EOF) {
-        c = buf[position++];
+        c = buf.codePointAt(position++);
         if (blockquote(c)) {
           length = (position - 1) - offset;
-          handler.stringValue(name, new String(buf, offset, length));
+          handler.stringValue(name, buf.substring(offset, offset+length));
           position += 2;
           return true;
         }
@@ -119,6 +105,21 @@ public class JslParser<T extends JslListener> extends JsonParser<T>{
       throw new ParseException("non-terminated block" + location());
     }
     return false;
+  }
+
+  static boolean isIdentifierStart(int c) {
+    return (c >= 'A' && 'Z' >= c) || (c >= 'a' && 'z' >= c) || (c == '$') || (c == '_');
+  } // A-Z a-z or $ or _
+
+  static boolean isIdentifierPart(int c) {
+    return (c >= '0' && '9' >= c) || isIdentifierStart(c);
+  } // 0-9 or A-Z a-z or $ or _
+
+  static boolean isIdentifierSymbol(int c) {
+    return switch (c) {
+      case '!', '#', '$', '%', '&', '*', '.', '/', '<', '=', '>', '?', '@', '^', '|', '~' -> true;
+      default -> false; // excludes ' ( ) + , - : ; [ ] _ ` { }
+    };
   }
 
 }
